@@ -589,6 +589,29 @@ python3 llama3_chunk_integration.py --convert llama3-8b.safetensors --output ./c
 
 ---
 
+## 🛠️ SISTEMA DE RECUPERAÇÃO MESTRE (RECOVERY)
+Se o sistema sofrer danos críticos ou arquivos forem deletados acidentalmente, utilize o **Master Engineer Recovery Script v2.0**.
+
+### Como usar:
+```bash
+# Recuperação automática completa (Modo Seguro)
+python3 chunk_recovery.py --auto
+
+# Modo Centro de Comando Interativo (Recomendado para engenheiros)
+python3 chunk_recovery.py --interactive
+
+# Criar um backup de emergência agora
+python3 chunk_recovery.py --backup
+```
+
+### Funcionalidades v2.0:
+- **Self-Healing**: Detecta arquivos corrompidos e reconstrói o kernel em segundos.
+- **Failover**: Suporte a múltiplos repositórios para download de dependências.
+- **Gerenciamento de Backups**: Interface para criar, listar e restaurar pontos de recuperação.
+- **Assinatura Digital**: Validação automática de integridade CNGSM.
+
+---
+
 ## 🎓 CONCLUSÃO
 CHUNK OS está agora instalado, configurado e pronto para uso.
 
