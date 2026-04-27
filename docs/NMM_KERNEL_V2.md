@@ -113,6 +113,15 @@ python3 nmm_kernel_v2.py --ram 2048 --layers 64
 
 ---
 
+## 🛡️ AUDITORIA E VALIDAÇÃO
+Utilize o `chunk_auditor.py` para validar sua instalação:
+```bash
+python3 chunk_auditor.py --quick
+```
+O auditor validará se o NMM v2.0 está operando dentro dos parâmetros de performance esperados (Score > 90).
+
+---
+
 ## 🎓 CONCLUSÃO
 O NMM Kernel v2.0 está evoluído, testado e pronto para a próxima geração de LLMs em *edge computing*.
 

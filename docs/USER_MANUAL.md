@@ -536,6 +536,31 @@ Para mais detalhes técnicos, consulte [NMM_KERNEL_V2.md](file:///c:/Users/user/
 
 ---
 
+## 🛡️ SISTEMA DE AUDITORIA (AUDITOR)
+Para garantir que sua instalação do CHUNK OS está correta e operando com performance máxima, utilize o **System Auditor**.
+
+### Como usar:
+```bash
+# Auditoria completa (recomendado)
+python3 chunk_auditor.py
+
+# Auditoria rápida (apenas itens críticos)
+python3 chunk_auditor.py --quick
+
+# Auditar em diretório específico
+python3 chunk_auditor.py --path /home/user/chunk-os
+```
+
+### O que é auditado?
+- **Integridade de Arquivos**: Verifica se o kernel e drivers estão presentes.
+- **Performance**: Mede latência de page faults e hit rate do prefetch.
+- **Dependências**: Valida se gcc, make e numpy estão instalados.
+- **Segurança**: Verifica permissões e riscos de execução.
+
+Ao final, o auditor gera um **Score (0-100)** e recomendações de melhoria.
+
+---
+
 ## 🎓 CONCLUSÃO
 CHUNK OS está agora instalado, configurado e pronto para uso.
 
