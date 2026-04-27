@@ -1,87 +1,135 @@
 #include "libkvcompress.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
+#include <math.h>
 
-#define MAX_KV_TOKENS 16384
-
-typedef struct {
-    chunk_token_t token;
-    void* k;
-    void* v;
-    size_t size;
-    float importance;
-    uint64_t timestamp;
-} kv_entry_t;
-
-static kv_entry_t cache[MAX_KV_TOKENS];
-static int cache_count = 0;
-static chunk_kv_compression_t current_method = CHUNK_KV_COMPRESS_HYBRID;
-static float current_ratio = 0.1f;
-static int current_window = 1024;
-
-int kv_compress_init(chunk_kv_compression_t method, float ratio) {
-    current_method = method;
-    current_ratio = ratio;
-    memset(cache, 0, sizeof(cache));
-    cache_count = 0;
-    return 0;
-}
-
-int kv_cache_add(chunk_token_t token, void* k, void* v, size_t size) {
-    if (cache_count >= MAX_KV_TOKENS) {
-        kv_apply_compression();
-    }
+// Quickselect para encontrar top-k
+static void quickselect(float* arr, uint32_t* idx, int left, int right, int k) {
+    if (left >= right) return;
     
-    kv_entry_t* entry = &cache[cache_count++];
-    entry->token = token;
-    entry->k = malloc(size);
-    entry->v = malloc(size);
-    memcpy(entry->k, k, size);
-    memcpy(entry->v, v, size);
-    entry->size = size;
-    entry->importance = 1.0f; // Default
-    static uint64_t time_counter = 0;
-    entry->timestamp = time_counter++;
+    float pivot = arr[left];
+    uint32_t pivot_idx = idx[left];
+    int i = left, j = right;
     
-    return 0;
-}
-
-int kv_apply_compression(void) {
-    if (current_method == CHUNK_KV_COMPRESS_NONE) return 0;
-    
-    printf("[KV] Aplicando compressão: %d (ratio: %.2f)\n", 
-           current_method, current_ratio);
-    
-    // Simulação: remove tokens menos importantes ou fora da janela
-    int kept = 0;
-    for (int i = 0; i < cache_count; i++) {
-        int is_recent = (cache_count - i) < current_window;
-        int is_important = cache[i].importance > (1.0f - current_ratio);
-        
-        if (is_recent || is_important) {
-            if (kept != i) {
-                cache[kept] = cache[i];
-            }
-            kept++;
-        } else {
-            free(cache[i].k);
-            free(cache[i].v);
+    while (i < j) {
+        while (i < j && arr[j] <= pivot) j--;
+        if (i < j) {
+            arr[i] = arr[j];
+            idx[i] = idx[j];
+            i++;
+        }
+        while (i < j && arr[i] >= pivot) i++;
+        if (i < j) {
+            arr[j] = arr[i];
+            idx[j] = idx[i];
+            j--;
         }
     }
+    arr[i] = pivot;
+    idx[i] = pivot_idx;
     
-    cache_count = kept;
-    return 0;
+    if (i == k) return;
+    if (i < k) quickselect(arr, idx, i + 1, right, k);
+    else quickselect(arr, idx, left, i - 1, k);
 }
 
-double kv_get_compression_ratio(void) {
-    return (double)cache_count / MAX_KV_TOKENS;
+// Calcula importância de cada token
+float kv_calculate_importance(kv_context_t* ctx, uint32_t token_idx) {
+    float attention = ctx->attention_scores[token_idx];
+    float recency = exp(-(float)token_idx / (ctx->original_length > 0 ? ctx->original_length : 1));
+    return attention * (1.0f + recency);
 }
 
-size_t kv_get_memory_usage(void) {
-    size_t total = 0;
-    for (int i = 0; i < cache_count; i++) {
-        total += cache[i].size * 2;
+// Compressão Top-K
+kv_context_t* kv_compress_topk(kv_context_t* ctx, uint32_t k) {
+    if (k >= ctx->original_length) return ctx;
+    
+    // Cria array de índices e calcula importâncias
+    uint32_t* indices = malloc(ctx->original_length * sizeof(uint32_t));
+    float* scores = malloc(ctx->original_length * sizeof(float));
+    
+    for (uint32_t i = 0; i < ctx->original_length; i++) {
+        indices[i] = i;
+        scores[i] = kv_calculate_importance(ctx, i);
     }
-    return total;
+    
+    // Seleciona top-k
+    quickselect(scores, indices, 0, ctx->original_length - 1, k);
+    
+    // Cria contexto comprimido
+    kv_context_t* compressed = malloc(sizeof(kv_context_t));
+    compressed->keys = malloc(k * sizeof(float));
+    compressed->values = malloc(k * sizeof(float));
+    compressed->attention_scores = malloc(k * sizeof(float));
+    compressed->original_length = ctx->original_length;
+    compressed->compressed_length = k;
+    compressed->compression_ratio = (float)k / ctx->original_length;
+    
+    for (uint32_t i = 0; i < k; i++) {
+        uint32_t orig_idx = indices[i];
+        compressed->keys[i] = ctx->keys[orig_idx];
+        compressed->values[i] = ctx->values[orig_idx];
+        compressed->attention_scores[i] = ctx->attention_scores[orig_idx];
+    }
+    
+    free(indices);
+    free(scores);
+    
+    return compressed;
+}
+
+// Compressão híbrida simplificada
+kv_context_t* kv_compress_hybrid(kv_context_t* ctx, 
+                                 uint32_t window_size, 
+                                 float sparsity_ratio) {
+    if (ctx->original_length <= window_size) return ctx;
+    
+    uint32_t sparse_size = (ctx->original_length - window_size) * sparsity_ratio;
+    uint32_t total = window_size + sparse_size;
+    
+    // Cria contexto com janela completa + Top-K do resto
+    kv_context_t* result = malloc(sizeof(kv_context_t));
+    result->keys = malloc(total * sizeof(float));
+    result->values = malloc(total * sizeof(float));
+    result->attention_scores = malloc(total * sizeof(float));
+    result->original_length = ctx->original_length;
+    result->compressed_length = total;
+    result->compression_ratio = (float)total / ctx->original_length;
+    
+    // Copia janela recente
+    for (uint32_t i = 0; i < window_size; i++) {
+        uint32_t orig_idx = ctx->original_length - window_size + i;
+        result->keys[i] = ctx->keys[orig_idx];
+        result->values[i] = ctx->values[orig_idx];
+        result->attention_scores[i] = ctx->attention_scores[orig_idx];
+    }
+    
+    // Comprime parte antiga com Top-K
+    kv_context_t* old_part = malloc(sizeof(kv_context_t));
+    old_part->original_length = ctx->original_length - window_size;
+    old_part->keys = ctx->keys;
+    old_part->values = ctx->values;
+    old_part->attention_scores = ctx->attention_scores;
+    
+    kv_context_t* compressed_old = kv_compress_topk(old_part, sparse_size);
+    
+    // Copia parte comprimida
+    for (uint32_t i = 0; i < sparse_size; i++) {
+        result->keys[window_size + i] = compressed_old->keys[i];
+        result->values[window_size + i] = compressed_old->values[i];
+        result->attention_scores[window_size + i] = compressed_old->attention_scores[i];
+    }
+    
+    kv_context_free(compressed_old);
+    free(old_part);
+    
+    return result;
+}
+
+void kv_context_free(kv_context_t* ctx) {
+    if (!ctx) return;
+    free(ctx->keys);
+    free(ctx->values);
+    free(ctx->attention_scores);
+    free(ctx);
 }

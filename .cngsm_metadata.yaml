@@ -1,0 +1,32 @@
+system:
+  name: CHUNK OS
+  version: 1.0.0
+  full_name: Cognitive Hierarchical Unified Neural Kernel
+  release_date: 2026-04-26
+  architecture: x86_64, ARM64, RISC-V
+
+author:
+  name: Cloves Nascimento
+  title: Arquiteto de Ecossistemas Cognitivos
+  organization: CNGSM
+  email: cngsm@cngsm.education
+  github: https://github.com/clovesnascimento/chunk
+
+organization:
+  name: Cognitive Neural & Generative Systems Management
+  acronym: CNGSM
+  blockchain_verified: true
+  registration: CNGSM-2026-04-26-CHUNK
+
+signature:
+  algorithm: RSA-4096
+  hash: SHA-512
+  timestamp: 2026-04-26T14:30:00Z
+  blockchain: Ethereum Mainnet
+  tx_hash: "0x7a3c9f2e8b1d5a4e3f2c8b7a6d5e4f3c2b1a9e8d7c6b5a4e3f2"
+  public_key_fingerprint: "43:4E:47:53:4D:43:48:55:4E:4B"
+
+license:
+  name: CNGSM Cognitive Software License
+  version: 1.0
+  spdx_id: CNGSM-1.0

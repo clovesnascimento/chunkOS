@@ -1,24 +1,33 @@
-; CHUNK OS Bootloader (Stub)
-; Minimal x86_64 bootloader to transition to protected mode
+; CHUNK OS Bootloader
+; CNGSM — Cloves Nascimento
+; Boot assembly para sistemas x86_64 (simulação)
 
-[BITS 16]
-[ORG 0x7C00]
+section .text
+global _start
 
-start:
-    cli
-    xor ax, ax
+_start:
+    ; Inicializa segmentos
+    mov ax, 0x07C0
     mov ds, ax
     mov es, ax
+    mov fs, ax
+    mov gs, ax
+    
+    ; Configura pilha
+    mov ax, 0x9000
     mov ss, ax
-    mov sp, 0x7C00
-
-    ; Print greeting
-    mov si, msg_hello
+    mov sp, 0xFFFF
+    
+    ; Mostra banner
+    mov si, boot_msg
     call print_string
-
-    ; Transition to 32-bit (Stub)
-    ; Real bootloader would load kernel here
-    jmp $
+    
+    ; Carrega kernel do CHUNK
+    mov si, loading_msg
+    call print_string
+    
+    ; Jump para o kernel
+    jmp 0x1000:0x0000
 
 print_string:
     lodsb
@@ -30,7 +39,10 @@ print_string:
 .done:
     ret
 
-msg_hello db 'CHUNK OS Booting...', 0x0D, 0x0A, 0
+; Dados
+boot_msg db 'CHUNK OS - Cognitive Neural Kernel', 0x0D, 0x0A, 0
+loading_msg db 'Loading CHUNK kernel...', 0x0D, 0x0A, 0
 
-times 510-($-$$) db 0
+; Padding para 512 bytes (boot sector)
+times 510 - ($ - $$) db 0
 dw 0xAA55

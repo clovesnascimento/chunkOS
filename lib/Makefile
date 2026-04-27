@@ -1,15 +1,17 @@
 # CHUNK OS Libraries Makefile
 
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -fPIC -I../include
-LDFLAGS = -shared
+CFLAGS = -Wall -Wextra -O2 -fPIC -I../include -I.
+LDFLAGS = -shared -lm
 
-LIB_OBJS = libkvcompress.o libprefetch.o
-LIB_OUT = libchunk_utils.so
+LIBS = libkvcompress.so libprefetch.so
 
-all: $(LIB_OUT)
+all: $(LIBS)
 
-$(LIB_OUT): $(LIB_OBJS)
+libkvcompress.so: libkvcompress.o
+	$(CC) $(LDFLAGS) -o $@ $^
+
+libprefetch.so: libprefetch.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
 %.o: %.c
@@ -19,7 +21,6 @@ clean:
 	rm -f *.o *.so
 
 install:
-	mkdir -p /chunk/lib/
-	cp $(LIB_OUT) /chunk/lib/
+	cp *.so /chunk/lib/
 
 .PHONY: all clean install

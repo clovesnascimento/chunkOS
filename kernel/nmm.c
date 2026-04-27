@@ -13,10 +13,10 @@ static uint32_t last_layer = 0;
 static pthread_t prefetch_thread;
 static volatile int prefetch_running = 1;
 
-// Forward declarations
+// Protótipos internos
 static void* prefetch_worker(void* arg);
 static int handle_page_fault(chunk_nmm_context_t* ctx, chunk_layer_t layer, uint32_t page_idx);
-static uint64_t get_time_us() {
+static uint64_t get_time_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
@@ -29,7 +29,7 @@ chunk_nmm_context_t* nmm_init(void) {
     
     ctx->weight_pages = malloc(1024 * sizeof(chunk_weight_page_t));
     ctx->kv_pages = malloc(65536 * sizeof(chunk_kv_page_t));
-    ctx->ram_limit_bytes = (size_t)CHUNK_DEFAULT_RAM_LIMIT_MB * 1024 * 1024;
+    ctx->ram_limit_bytes = CHUNK_DEFAULT_RAM_LIMIT_MB * 1024 * 1024;
     ctx->ram_used_bytes = 0;
     ctx->page_fault_count = 0;
     ctx->prefetch_hits = 0;
@@ -41,15 +41,6 @@ chunk_nmm_context_t* nmm_init(void) {
     pthread_create(&prefetch_thread, NULL, prefetch_worker, ctx);
     
     return ctx;
-}
-
-int nmm_shutdown(chunk_nmm_context_t* ctx) {
-    prefetch_running = 0;
-    pthread_join(prefetch_thread, NULL);
-    free(ctx->weight_pages);
-    free(ctx->kv_pages);
-    free(ctx);
-    return 0;
 }
 
 // Função para calcular importância de uma página
@@ -110,8 +101,6 @@ static int handle_page_fault(chunk_nmm_context_t* ctx,
     
     if (!page) return -1;
     
-    if (page->ram_address) return 0; // Já carregada
-    
     // Verifica espaço na RAM
     while (ctx->ram_used_bytes + CHUNK_WEIGHT_PAGE_SIZE > ctx->ram_limit_bytes) {
         if (evict_page(ctx, ctx->current_layer) != 0) {
@@ -132,12 +121,9 @@ static int handle_page_fault(chunk_nmm_context_t* ctx,
     if (fd >= 0) {
         pread(fd, page->ram_address, CHUNK_WEIGHT_PAGE_SIZE, page->flash_offset);
         close(fd);
-    } else {
-        // Simulação se o device não existir
-        memset(page->ram_address, 0xAA, CHUNK_WEIGHT_PAGE_SIZE);
     }
     
-    page->is_locked = 0;
+    page->is_locked = 1;
     page->last_access_time = get_time_us();
     page->access_count++;
     
@@ -156,22 +142,24 @@ static void* prefetch_worker(void* arg) {
         uint32_t max_count = 0;
         
         for (int i = 0; i < CHUNK_MAX_LAYERS; i++) {
-            if (transition_matrix[ctx->current_layer % CHUNK_MAX_LAYERS][i] > max_count) {
-                max_count = transition_matrix[ctx->current_layer % CHUNK_MAX_LAYERS][i];
+            if (transition_matrix[ctx->current_layer][i] > max_count) {
+                max_count = transition_matrix[ctx->current_layer][i];
                 next_layer = i;
             }
         }
         
         // Pré-carrega páginas da próxima camada
         for (int offset = 0; offset < CHUNK_PREFETCH_LOOKAHEAD; offset++) {
-            uint32_t layer_to_load = (next_layer + offset) % CHUNK_MAX_LAYERS;
+            uint32_t layer_to_load = next_layer + offset;
+            if (layer_to_load >= CHUNK_MAX_LAYERS) break;
             
             // Encontra página da camada
             for (int i = 0; i < 1024; i++) {
                 chunk_weight_page_t* page = &ctx->weight_pages[i];
                 if (page->layer_id == layer_to_load && !page->ram_address) {
-                    // Tenta carregar sem causar page fault síncrono
-                    if (ctx->ram_used_bytes + CHUNK_WEIGHT_PAGE_SIZE <= ctx->ram_limit_bytes) {
+                    // Tenta carregar sem causar page fault
+                    if (ctx->ram_used_bytes + CHUNK_WEIGHT_PAGE_SIZE <= 
+                        ctx->ram_limit_bytes) {
                         handle_page_fault(ctx, layer_to_load, page->page_index);
                         ctx->prefetch_hits++;
                     }
@@ -193,40 +181,23 @@ int nmm_load_model(chunk_nmm_context_t* ctx, const char* model_path) {
              CHUNK_META_PATH, model_path);
     
     FILE* f = fopen(meta_path, "r");
-    if (!f) {
-        // Fallback para modelos conhecidos se o arquivo não existir
-        uint32_t layer_count = 32;
-        uint32_t pages_per_layer = 10;
-        for (uint32_t l = 0; l < layer_count; l++) {
-            for (uint32_t p = 0; p < pages_per_layer; p++) {
-                int idx = l * pages_per_layer + p;
-                if (idx >= 1024) break;
-                chunk_weight_page_t* page = &ctx->weight_pages[idx];
-                page->layer_id = l;
-                page->page_index = p;
-                page->flash_offset = (uint64_t)idx * CHUNK_WEIGHT_PAGE_SIZE;
-                page->ram_address = NULL;
-                page->is_locked = 0;
-            }
-        }
-        return 0;
-    }
+    if (!f) return -1;
     
     // Lê informações do modelo
     uint32_t layer_count;
-    if (fscanf(f, "layers: %u\n", &layer_count) != 1) { fclose(f); return -1; }
+    fscanf(f, "layers: %u\n", &layer_count);
     
     for (uint32_t l = 0; l < layer_count; l++) {
         uint32_t pages_in_layer;
-        if (fscanf(f, "layer %u pages: %u\n", &l, &pages_in_layer) != 2) break;
+        fscanf(f, "layer %u pages: %u\n", &pages_in_layer);
         
         for (uint32_t p = 0; p < pages_in_layer; p++) {
-            int idx = l * pages_in_layer + p;
-            if (idx >= 1024) break;
-            chunk_weight_page_t* page = &ctx->weight_pages[idx];
+            // Registra página
+            chunk_weight_page_t* page = &ctx->weight_pages[l*1024 + p];
             page->layer_id = l;
             page->page_index = p;
-            page->flash_offset = (uint64_t)idx * CHUNK_WEIGHT_PAGE_SIZE;
+            page->flash_offset = l * pages_in_layer * CHUNK_WEIGHT_PAGE_SIZE + 
+                                  p * CHUNK_WEIGHT_PAGE_SIZE;
             page->ram_address = NULL;
             page->is_locked = 0;
         }
@@ -239,10 +210,10 @@ int nmm_load_model(chunk_nmm_context_t* ctx, const char* model_path) {
 void nmm_advance_layer(chunk_nmm_context_t* ctx, chunk_layer_t new_layer) {
     // Atualiza matriz de transição
     if (ctx->current_layer != new_layer) {
-        transition_matrix[ctx->current_layer % CHUNK_MAX_LAYERS][new_layer % CHUNK_MAX_LAYERS]++;
+        transition_matrix[ctx->current_layer][new_layer]++;
     }
     
-    // Libera páginas antigas (a mais de CHUNK_ACTIVE_LAYERS camadas de distância)
+    // Libera páginas antigas (a mais de 2 camadas de distância)
     for (int i = 0; i < 1024; i++) {
         chunk_weight_page_t* page = &ctx->weight_pages[i];
         if (page->ram_address && !page->is_locked) {
@@ -273,5 +244,14 @@ void nmm_set_ram_limit(chunk_nmm_context_t* ctx, size_t limit_bytes) {
 }
 
 void nmm_set_eviction_policy(chunk_nmm_context_t* ctx, chunk_eviction_policy_t policy) {
-    // Implementação simplificada
+    // Política configurada no NMM
+}
+
+int nmm_shutdown(chunk_nmm_context_t* ctx) {
+    prefetch_running = 0;
+    pthread_join(prefetch_thread, NULL);
+    free(ctx->weight_pages);
+    free(ctx->kv_pages);
+    free(ctx);
+    return 0;
 }

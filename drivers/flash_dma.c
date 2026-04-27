@@ -17,21 +17,23 @@ static pthread_mutex_t dma_mutex = PTHREAD_MUTEX_INITIALIZER;
 // Simulação de DMA worker thread
 static void* dma_worker(void* arg) {
     dma_channel_t* channel = (dma_channel_t*)arg;
+    int fd = open("/dev/chunk_flash", O_RDONLY);
+    
+    if (fd < 0) {
+        // Simulação: cria arquivo dummy se não existir
+        fd = open("/tmp/chunk_flash_dummy", O_RDONLY | O_CREAT, 0644);
+    }
     
     while (1) {
-        if (channel->is_busy) {
-            // Simula latência de leitura
-            usleep(1000); 
+        if (channel->is_busy && channel->src_addr) {
+            // Simula DMA read
+            pread(fd, channel->dst_addr, channel->size,
+                  (off_t)(uint64_t)channel->src_addr);
             
             pthread_mutex_lock(&dma_mutex);
             total_bytes += channel->size;
             transaction_count++;
             pthread_mutex_unlock(&dma_mutex);
-            
-            // Simula cópia de dados
-            if (channel->dst_addr) {
-                memset(channel->dst_addr, 0xBB, channel->size);
-            }
             
             channel->is_busy = 0;
             
@@ -39,9 +41,10 @@ static void* dma_worker(void* arg) {
                 channel->callback(channel->callback_arg);
             }
         }
-        usleep(100); // Polling
+        usleep(10); // Polling
     }
     
+    if (fd >= 0) close(fd);
     return NULL;
 }
 
@@ -74,7 +77,7 @@ int dma_async_read(dma_channel_t* channel,
                    void* arg) {
     if (!channel || channel->is_busy) return -1;
     
-    channel->src_addr = (void*)(uintptr_t)flash_offset;
+    channel->src_addr = (void*)(uint64_t)flash_offset;
     channel->dst_addr = ram_addr;
     channel->size = size;
     channel->callback = callback;
@@ -95,7 +98,7 @@ int dma_sync_read(dma_channel_t* channel,
         usleep(100);
     }
     
-    channel->src_addr = (void*)(uintptr_t)flash_offset;
+    channel->src_addr = (void*)(uint64_t)flash_offset;
     channel->dst_addr = ram_addr;
     channel->size = size;
     channel->callback = NULL;

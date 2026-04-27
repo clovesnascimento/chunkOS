@@ -9,11 +9,10 @@ typedef enum {
     EVICT_LRU,
     EVICT_LFU,
     EVICT_MFU,
-    EVICT_FIFO,
-    EVICT_IMPORTANCE
+    EVICT_FIFO
 } evict_algorithm_t;
 
-static evict_algorithm_t current_algorithm = EVICT_IMPORTANCE;
+static evict_algorithm_t current_algorithm = EVICT_LRU;
 
 // LRU - Least Recently Used
 static chunk_weight_page_t* evict_lru(chunk_nmm_context_t* ctx) {
@@ -49,6 +48,23 @@ static chunk_weight_page_t* evict_lfu(chunk_nmm_context_t* ctx) {
     return least_used;
 }
 
+// MFU - Most Frequently Used (para cache de modelo)
+static chunk_weight_page_t* evict_mfu(chunk_nmm_context_t* ctx) {
+    chunk_weight_page_t* most_used = NULL;
+    uint32_t max_access = 0;
+    
+    for (int i = 0; i < 1024; i++) {
+        chunk_weight_page_t* page = &ctx->weight_pages[i];
+        if (page->ram_address && !page->is_locked) {
+            if (page->access_count > max_access) {
+                max_access = page->access_count;
+                most_used = page;
+            }
+        }
+    }
+    return most_used;
+}
+
 // FIFO - First In First Out
 static chunk_weight_page_t* evict_fifo(chunk_nmm_context_t* ctx) {
     static int cursor = 0;
@@ -72,6 +88,8 @@ chunk_weight_page_t* select_victim_page(chunk_nmm_context_t* ctx) {
             return evict_lru(ctx);
         case EVICT_LFU:
             return evict_lfu(ctx);
+        case EVICT_MFU:
+            return evict_mfu(ctx);
         case EVICT_FIFO:
             return evict_fifo(ctx);
         default:
@@ -88,10 +106,10 @@ void set_eviction_algorithm(chunk_eviction_policy_t policy) {
             current_algorithm = EVICT_LFU;
             break;
         case CHUNK_EVICT_IMPORTANCE:
-            current_algorithm = EVICT_LRU; // Simplificação
-            break;
-        default:
             current_algorithm = EVICT_LRU;
+            break;
+        case CHUNK_EVICT_DISTANCE_AWARE:
+            current_algorithm = EVICT_LFU;
             break;
     }
 }
@@ -117,6 +135,5 @@ size_t chunk_get_ram_limit(chunk_nmm_context_t* ctx) {
 }
 
 double chunk_get_memory_pressure(chunk_nmm_context_t* ctx) {
-    if (ctx->ram_limit_bytes == 0) return 0.0;
-    return (double)ctx->ram_used_bytes / ctx->ram_limit_bytes;
+    return (double)ctx->ram_used_bytes / (ctx->ram_limit_bytes > 0 ? ctx->ram_limit_bytes : 1);
 }

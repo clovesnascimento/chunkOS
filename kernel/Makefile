@@ -19,7 +19,6 @@ clean:
 	rm -f *.o *.so
 
 install:
-	mkdir -p /chunk/lib/
 	cp $(KERNEL_LIB) /chunk/lib/
 
 .PHONY: all clean install

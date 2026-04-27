@@ -1,88 +1,130 @@
 #include "libprefetch.h"
+#include "../kernel/nmm.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <pthread.h>
 
-static uint32_t** markov_table = NULL;
-static uint32_t* transition_totals = NULL;
-static uint32_t num_layers = 0;
-static uint64_t total_preds = 0;
-static uint64_t total_hits = 0;
+// Protótipo interno (implementado no nmm.c)
+extern void nmm_prefetch_layer(chunk_nmm_context_t* ctx, uint32_t layer);
 
-int prefetch_init(uint32_t layers) {
-    num_layers = layers;
-    markov_table = malloc(layers * sizeof(uint32_t*));
-    transition_totals = calloc(layers, sizeof(uint32_t));
+markov_predictor_t* prefetch_predictor_init(uint32_t order) {
+    markov_predictor_t* pred = malloc(sizeof(markov_predictor_t));
+    if (!pred) return NULL;
     
-    for (uint32_t i = 0; i < layers; i++) {
-        markov_table[i] = calloc(layers, sizeof(uint32_t));
-        // Inicializa com probabilidade linear (camada i -> i+1)
-        if (i < layers - 1) {
-            markov_table[i][i+1] = 1;
-            transition_totals[i] = 1;
-        }
-    }
-    return 0;
+    pred->order = order;
+    memset(pred->transition_matrix, 0, sizeof(pred->transition_matrix));
+    memset(pred->last_states, 0, sizeof(pred->last_states));
+    
+    return pred;
 }
 
-void prefetch_observe_transition(chunk_layer_t from, chunk_layer_t to) {
-    if (from < num_layers && to < num_layers) {
-        markov_table[from][to]++;
-        transition_totals[from]++;
+void prefetch_predictor_update(markov_predictor_t* pred,
+                               uint32_t from_layer,
+                               uint32_t to_layer) {
+    pred->transition_matrix[from_layer % 256][to_layer % 256]++;
+    
+    // Atualiza histórico
+    for (int i = pred->order - 1; i > 0; i--) {
+        pred->last_states[i] = pred->last_states[i - 1];
     }
+    pred->last_states[0] = from_layer;
 }
 
-int prefetch_predict(chunk_layer_t current, 
-                     chunk_layer_t* predicted, 
-                     int count,
-                     float* confidence) {
-    if (current >= num_layers) return 0;
+uint32_t* prefetch_predict_next(markov_predictor_t* pred,
+                                uint32_t current_layer,
+                                uint32_t count) {
+    uint32_t* predictions = malloc(count * sizeof(uint32_t));
+    if (!predictions) return NULL;
     
-    total_preds++;
+    uint32_t current = current_layer;
     
-    int found = 0;
-    uint32_t total = transition_totals[current];
-    
-    if (total == 0) {
-        // Fallback: sequência linear
-        for (int i = 0; i < count; i++) {
-            predicted[i] = (current + 1 + i) % num_layers;
-            confidence[i] = 0.5f;
-        }
-        return count;
-    }
-    
-    // Encontra as 'count' transições mais prováveis
-    // Simplificação: pega as próximas na sequência com maior peso
-    for (int i = 0; i < count; i++) {
-        uint32_t best_next = (current + 1 + i) % num_layers;
-        uint32_t max_val = markov_table[current][best_next];
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t best_next = current + 1;
+        uint32_t max_count = 0;
         
-        for (uint32_t l = 0; l < num_layers; l++) {
-            if (markov_table[current][l] > max_val) {
-                max_val = markov_table[current][l];
-                best_next = l;
+        // Busca próxima camada mais provável
+        for (int next = 0; next < 256; next++) {
+            uint32_t trans = pred->transition_matrix[current % 256][next];
+            if (trans > max_count) {
+                max_count = trans;
+                best_next = next;
             }
         }
         
-        predicted[i] = best_next;
-        confidence[i] = (float)max_val / total;
-        found++;
+        predictions[i] = best_next;
+        current = best_next;
     }
     
-    return found;
+    return predictions;
 }
 
-double prefetch_get_hit_rate(void) {
-    if (total_preds == 0) return 1.0;
-    return (double)total_hits / total_preds;
-}
-
-int prefetch_shutdown(void) {
-    for (uint32_t i = 0; i < num_layers; i++) {
-        free(markov_table[i]);
+float prefetch_get_confidence(markov_predictor_t* pred,
+                              uint32_t from_layer,
+                              uint32_t to_layer) {
+    uint32_t total = 0;
+    uint32_t target = pred->transition_matrix[from_layer % 256][to_layer % 256];
+    
+    for (int i = 0; i < 256; i++) {
+        total += pred->transition_matrix[from_layer % 256][i];
     }
-    free(markov_table);
-    free(transition_totals);
-    return 0;
+    
+    if (total == 0) return 0.0f;
+    return (float)target / total;
+}
+
+void prefetch_predictor_free(markov_predictor_t* pred) {
+    free(pred);
+}
+
+// Thread de prefetch adaptativo
+static void* prefetch_adaptive_worker(void* arg) {
+    adaptive_prefetcher_t* prefetcher = (adaptive_prefetcher_t*)arg;
+    
+    while (prefetcher->is_running) {
+        chunk_layer_t current = nmm_get_current_layer(prefetcher->nmm_ctx);
+        
+        // Prediz próximas 3 camadas
+        uint32_t* next_layers = prefetch_predict_next(prefetcher->predictor,
+                                                       current,
+                                                       3);
+        
+        if (next_layers) {
+            for (int i = 0; i < 3; i++) {
+                float confidence = prefetch_get_confidence(prefetcher->predictor,
+                                                           current + i,
+                                                           next_layers[i]);
+                
+                if (confidence > 0.4f) {
+                    // Pré-carrega camada predita (simulado)
+                    // Em um sistema real, chamaria a função de prefetch do kernel
+                }
+            }
+            free(next_layers);
+        }
+        
+        usleep(1000); // 1ms polling
+    }
+    
+    return NULL;
+}
+
+adaptive_prefetcher_t* prefetch_adaptive_init(chunk_nmm_context_t* ctx) {
+    adaptive_prefetcher_t* prefetcher = malloc(sizeof(adaptive_prefetcher_t));
+    prefetcher->predictor = prefetch_predictor_init(2);
+    prefetcher->nmm_ctx = ctx;
+    prefetcher->is_running = 1;
+    
+    pthread_create(&prefetcher->thread, NULL,
+                   prefetch_adaptive_worker, prefetcher);
+    
+    return prefetcher;
+}
+
+void prefetch_adaptive_destroy(adaptive_prefetcher_t* prefetcher) {
+    prefetcher->is_running = 0;
+    pthread_join(prefetcher->thread, NULL);
+    prefetch_predictor_free(prefetcher->predictor);
+    free(prefetcher);
 }

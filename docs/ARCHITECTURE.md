@@ -19,21 +19,6 @@ CHUNK OS é um sistema operacional especializado para execução de Large Langua
 
 ---
 
-## Arquitetura em Camadas
-┌─────────────────────────────────────────┐
-│ User Applications │
-├─────────────────────────────────────────┤
-│ CHUNK Runtime (libchunk) │
-├─────────────────────────────────────────┤
-│ Neural Memory Manager │
-├─────────────────────────────────────────┤
-│ DMA Drivers │ NPU Virtual Memory │
-├─────────────────────────────────────────┤
-│ Flash Storage (ROM) │
-└─────────────────────────────────────────┘
-
----
-
 ## Componentes Core
 
 ### 1. Neural Memory Manager (NMM)
@@ -79,3 +64,5 @@ organization: CNGSM
 signature_date: 2026-04-26
 version: 1.0.0
 ```
+
+"Engenheiros da próxima geração não perguntam 'dá pra fazer?' – eles entregam."

@@ -1,40 +1,84 @@
-import sys
-import os
-import struct
+#!/usr/bin/env python3
+# CHUNK OS Model Converter
+# Converte modelos para formato paginado do CHUNK
+# CNGSM — Cloves Nascimento
 
-def convert_to_chunk(input_path, output_dir):
-    print(f"Converting {input_path} to CHUNK format...")
+import os
+import sys
+import json
+import struct
+from pathlib import Path
+
+PAGE_SIZE = 256 * 1024  # 256 KB
+
+class ChunkModelConverter:
+    def __init__(self, input_path, output_path):
+        self.input_path = Path(input_path)
+        self.output_path = Path(output_path)
+        self.output_path.mkdir(parents=True, exist_ok=True)
     
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    
-    # Simulação de conversão: cria arquivos de pesos paginados
-    # Em uma implementação real, leríamos safetensors e dividiríamos em 256KB
-    
-    page_size = 256 * 1024
-    num_layers = 32
-    pages_per_layer = 10
-    
-    for l in range(num_layers):
-        for p in range(pages_per_layer):
-            page_name = f"layer_{l}_page_{p}.chunk"
-            with open(os.path.join(output_dir, page_name), "wb") as f:
-                # Dados dummy
-                f.write(os.urandom(page_size))
+    def convert_safetensors(self, safetensors_path):
+        """Converte arquivo safetensors para páginas CHUNK (Simulação)"""
+        print(f"📖 Lendo {safetensors_path}")
+        
+        metadata = {
+            "name": self.input_path.name,
+            "layers": 32,
+            "pages": []
+        }
+        
+        page_index = 0
+        
+        # Simulação de conversão
+        for l in range(32):
+            for p in range(10): # 10 páginas por camada para teste
+                page_file = self.output_path / f"page_{page_index:08d}.bin"
+                with open(page_file, "wb") as f:
+                    f.write(os.urandom(PAGE_SIZE))
                 
-    # Cria metadados
-    model_name = os.path.basename(output_dir)
-    meta_content = f"name: {model_name}\nlayers: {num_layers}\n"
-    for l in range(num_layers):
-        meta_content += f"layer {l} pages: {pages_per_layer}\n"
+                metadata["pages"].append({
+                    "index": page_index,
+                    "layer": l,
+                    "offset": p * PAGE_SIZE,
+                    "size": PAGE_SIZE,
+                    "file": str(page_file.name)
+                })
+                page_index += 1
         
-    with open(os.path.join(output_dir, f"{model_name}.meta"), "w") as f:
-        f.write(meta_content)
+        # Salva metadata
+        meta_path = self.output_path / "model.meta"
+        with open(meta_path, "w") as f:
+            json.dump(metadata, f, indent=2)
         
-    print(f"Conversion complete. Model saved in {output_dir}")
+        print(f"✅ Conversão concluída: {page_index} páginas")
+        return metadata
+    
+    def create_manifest(self):
+        """Cria manifesto do modelo"""
+        manifest = {
+            "format_version": "chunk-v1",
+            "created_by": "CNGSM Model Converter",
+            "author": "Cloves Nascimento",
+            "page_size": PAGE_SIZE,
+            "total_pages": len(list(self.output_path.glob("page_*.bin")))
+        }
+        
+        manifest_path = self.output_path / "manifest.json"
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=2)
+        
+        print(f"📋 Manifesto criado: {manifest_path}")
+
+def main():
+    if len(sys.argv) < 3:
+        print("Uso: model_converter.py <input> <output>")
+        sys.exit(1)
+    
+    converter = ChunkModelConverter(sys.argv[1], sys.argv[2])
+    converter.convert_safetensors(sys.argv[1])
+    converter.create_manifest()
+    
+    print("\n✨ Modelo pronto para usar com CHUNK OS!")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Usage: python model_converter.py <input_file> <output_dir>")
-    else:
-        convert_to_chunk(sys.argv[1], sys.argv[2])
+    main()

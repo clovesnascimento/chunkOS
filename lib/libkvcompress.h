@@ -1,29 +1,31 @@
 #ifndef LIBKVCOMPRESS_H
 #define LIBKVCOMPRESS_H
 
-#include "../include/chunk_types.h"
-#include "../include/chunk_constants.h"
+#include <stdint.h>
+#include <stddef.h>
 
-// API de compressão de KV Cache
-int kv_compress_init(chunk_kv_compression_t method, float ratio);
-int kv_compress_shutdown(void);
+typedef struct {
+    float* keys;
+    float* values;
+    float* attention_scores;
+    uint32_t original_length;
+    uint32_t compressed_length;
+    float compression_ratio;
+} kv_context_t;
 
-// Adiciona tokens ao cache
-int kv_cache_add(chunk_token_t token, void* k, void* v, size_t size);
+// Compressão Top-K: mantém apenas os K tokens mais importantes
+kv_context_t* kv_compress_topk(kv_context_t* ctx, uint32_t k);
 
-// Recupera tokens do cache
-int kv_cache_get(chunk_token_t token, void** k, void** v, size_t* size);
+// Compressão com janela: mantém W tokens recentes + resto esparso
+kv_context_t* kv_compress_window(kv_context_t* ctx, uint32_t window_size, float sparsity);
 
-// Aplica algoritmos de compressão
-int kv_apply_compression(void);
+// Compressão híbrida (recomendada)
+kv_context_t* kv_compress_hybrid(kv_context_t* ctx, 
+                                 uint32_t window_size, 
+                                 float sparsity_ratio);
 
-// Estratégias específicas
-int kv_compress_topk(int k);
-int kv_compress_window(int window_size);
-int kv_compress_hybrid(int window_size, float sparsity);
-
-// Estatísticas de compressão
-double kv_get_compression_ratio(void);
-size_t kv_get_memory_usage(void);
+// Utilitários
+void kv_context_free(kv_context_t* ctx);
+float kv_calculate_importance(kv_context_t* ctx, uint32_t token_idx);
 
 #endif

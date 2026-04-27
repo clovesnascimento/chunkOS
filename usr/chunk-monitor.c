@@ -1,52 +1,84 @@
+#include "../kernel/nmm.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "../kernel/nmm.h"
+#include <signal.h>
+#include <time.h>
 
-void clear_screen() {
-    printf("\033[H\033[J");
+static volatile int running = 1;
+
+void signal_handler(int sig) {
+    if (sig == SIGINT || sig == SIGTERM) {
+        running = 0;
+    }
 }
 
-int main() {
-    printf("📊 CHUNK System Monitor\n");
+void print_bar(double percentage, int width, const char* color) {
+    int filled = (int)(percentage * width);
+    printf("%s[", color);
+    for (int i = 0; i < width; i++) {
+        printf(i < filled ? "█" : "░");
+    }
+    printf("\033[0m] %.1f%%", percentage * 100);
+}
+
+int main(int argc, char** argv) {
+    (void)argc; (void)argv;
+    signal(SIGINT, signal_handler);
     
-    // Em uma implementação real, leríamos de /proc/chunk ou via IPC
-    // Aqui simulamos a leitura de estatísticas globais
+    printf("\n╔══════════════════════════════════════════════════════════════╗\n");
+    printf("║              CHUNK OS - System Monitor                       ║\n");
+    printf("║                    Pressione Ctrl+C para sair                 ║\n");
+    printf("╚══════════════════════════════════════════════════════════════╝\n\n");
     
-    while (1) {
-        clear_screen();
-        printf("========================================\n");
-        printf("   CHUNK OS - Monitor de Recursos      \n");
-        printf("========================================\n\n");
+    // Simulação de monitoramento (em produção, leria de /proc/chunk)
+    uint64_t page_faults = 0;
+    uint64_t prefetch_hits = 0;
+    double ram_usage = 0;
+    
+    while (running) {
+        printf("\033[H\033[J"); // Clear screen
         
-        // Simulação de valores
-        static float ram_usage = 1120.0f;
-        ram_usage += (rand() % 10 - 5);
+        printf("╔══════════════════════════════════════════════════════════════╗\n");
+        printf("║                    📊 ESTATÍSTICAS DO SISTEMA                 ║\n");
+        printf("╠══════════════════════════════════════════════════════════════╣\n");
         
-        printf("RAM Usage:      %.2f MB / 1536 MB\n", ram_usage);
-        printf("Page Faults/s:  %d\n", rand() % 5);
-        printf("Prefetch Hits:  %d%%\n", 70 + rand() % 10);
-        printf("DMA Throughput: %d MB/s\n", 45 + rand() % 20);
+        // Memória
+        printf("║ 💾 MEMÓRIA                                                    ║\n");
+        printf("║    RAM Usage:    ");
+        print_bar(ram_usage, 30, "\033[32m");
+        printf(" %5.1f MB / 1536 MB\n", ram_usage * 1536);
         
-        printf("\nCamadas Ativas:\n");
-        int current = rand() % 32;
-        printf("[");
-        for (int i = 0; i < 32; i++) {
-            if (i == current) printf("H");
-            else if (abs(i - current) < 3) printf("A");
-            else printf(".");
-        }
-        printf("]\n");
-        printf("(H=Head, A=Active, .=Paged-out)\n");
+        // Page Faults
+        printf("║ ⚡ PAGE FAULTS                                                ║\n");
+        printf("║    Total:        %12llu                                       ║\n", (unsigned long long)page_faults);
         
-        printf("\nConfiguração:\n");
-        printf("Policy: Importance-based\n");
-        printf("KV Cache: Hybrid (10%% sparsity)\n");
+        // Prefetch
+        printf("║ 🚀 PREFETCH                                                   ║\n");
+        printf("║    Hits:         %12llu                                       ║\n", (unsigned long long)prefetch_hits);
+        printf("║    Hit Rate:     %12.1f%%                                     ║\n",
+               prefetch_hits + page_faults > 0 ? 
+               100.0 * prefetch_hits / (prefetch_hits + page_faults) : 0);
         
-        printf("\nPresse Ctrl+C para sair\n");
+        // DMA
+        printf("║ 💿 DMA                                                       ║\n");
+        printf("║    Transfers:    %12llu                                       ║\n", 
+               (unsigned long long)(prefetch_hits + page_faults) / 10);
+        printf("║    Throughput:   %12.1f MB/s                                  ║\n", 
+               (prefetch_hits + page_faults) * 0.256);
         
-        usleep(1000000);
+        printf("╚══════════════════════════════════════════════════════════════╝\n");
+        printf("\n  🔄 Atualizando a cada 1 segundo... (Ctrl+C para sair)\n");
+        
+        // Simula atualização das métricas
+        page_faults += rand() % 5;
+        prefetch_hits += rand() % 15;
+        ram_usage = (ram_usage + (rand() % 100) / 1000.0);
+        if (ram_usage > 0.95) ram_usage = 0.95;
+        
+        sleep(1);
     }
     
+    printf("\n👋 Monitor encerrado.\n");
     return 0;
 }

@@ -7,14 +7,36 @@
 #include <signal.h>
 #include <unistd.h>
 
+// Protótipo interno (implementado no nmm.c)
+extern int handle_page_fault(chunk_nmm_context_t* ctx, chunk_layer_t layer, uint32_t page_idx);
+
 static chunk_nmm_context_t* global_ctx = NULL;
 static void* global_virtual_base = NULL;
 static uint64_t global_virtual_size = 0;
 static uint32_t page_size = 4096;
 static int auto_prefetch = 1;
 
-// Forward declaration if not in nmm.h
-// int handle_page_fault(chunk_nmm_context_t* ctx, chunk_layer_t layer, uint32_t page_idx);
+// Função de callback para page fault da NPU
+static void npu_page_fault_callback(void* fault_addr) {
+    if (!global_ctx) return;
+    
+    uint64_t offset = (uint64_t)fault_addr - (uint64_t)global_virtual_base;
+    chunk_layer_t layer = offset / (1024 * 1024 * 100); // Heurística
+    uint32_t page_idx = (offset % (1024 * 1024 * 100)) / page_size;
+    
+    // Resolve page fault via NMM
+    handle_page_fault(global_ctx, layer, page_idx);
+    
+    if (auto_prefetch) {
+        // Prefetch da próxima página
+        uint64_t next_offset = offset + page_size;
+        if (next_offset < global_virtual_size) {
+            chunk_layer_t next_layer = next_offset / (1024 * 1024 * 100);
+            uint32_t next_page = (next_offset % (1024 * 1024 * 100)) / page_size;
+            handle_page_fault(global_ctx, next_layer, next_page);
+        }
+    }
+}
 
 // Registra handler de page fault (simulado)
 int npu_register_virtual_region(chunk_nmm_context_t* ctx,
@@ -25,7 +47,7 @@ int npu_register_virtual_region(chunk_nmm_context_t* ctx,
     global_virtual_size = size;
     
     printf("[NPU] Região virtual registrada: %p - %p (%lu bytes)\n",
-           base, (char*)base + size, size);
+           base, (void*)((char*)base + size), size);
     
     return 0;
 }
@@ -57,10 +79,25 @@ int npu_map_model_to_virtual(chunk_nmm_context_t* ctx,
            model_name, virtual_base);
     
     // Simulação: carrega metadados do modelo
-    // Em uma implementação real, leríamos o meta_path
+    char meta_path[256];
+    snprintf(meta_path, sizeof(meta_path), "%s/%s.meta",
+             CHUNK_META_PATH, model_name);
+    
+    FILE* f = fopen(meta_path, "r");
+    if (!f) return -1;
+    
+    // Lê informações de camadas
+    uint32_t layer_count;
+    if (fscanf(f, "layers: %u\n", &layer_count) != 1) {
+        fclose(f);
+        return -1;
+    }
+    
+    fclose(f);
     
     // Registra região
-    return npu_register_virtual_region(ctx, virtual_base, 1024 * 1024 * 1024); // 1GB default
+    return npu_register_virtual_region(ctx, virtual_base,
+                                       (uint64_t)layer_count * 1024 * 1024 * 100);
 }
 
 void npu_set_page_size(uint32_t size) {

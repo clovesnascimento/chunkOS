@@ -1,25 +1,40 @@
-# CHUNK OS Root Makefile
+# CHUNK OS Master Makefile
 
-all: build
+.PHONY: all clean kernel lib usr package install test
 
-build:
-	chmod +x scripts/*.sh
-	./scripts/build.sh
+all: kernel lib usr package
+
+kernel:
+	$(MAKE) -C kernel
+
+lib:
+	$(MAKE) -C lib
+
+usr:
+	$(MAKE) -C usr
+
+package:
+	./scripts/package.sh
 
 install:
-	./scripts/install.sh /chunk
+	./scripts/install.sh
 
 test:
 	./scripts/test.sh
 
 clean:
-	cd kernel && make clean
-	cd lib && make clean
-	cd drivers && make clean
-	cd usr && make clean
-	rm -rf build/
+	$(MAKE) -C kernel clean
+	$(MAKE) -C lib clean
+	$(MAKE) -C usr clean
+	rm -rf build/ chunk-rom-*.zip
 
-package:
-	./scripts/package.sh
-
-.PHONY: all build install test clean package
+help:
+	@echo "CHUNK OS - Commands:"
+	@echo "  make all      - Build everything"
+	@echo "  make kernel   - Build only kernel"
+	@echo "  make lib      - Build libraries"
+	@echo "  make usr      - Build user tools"
+	@echo "  make package  - Create ROM zip"
+	@echo "  make install  - Install system"
+	@echo "  make test     - Run tests"
+	@echo "  make clean    - Clean build artifacts"

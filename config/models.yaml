@@ -1,24 +1,47 @@
+# Model Registry for CHUNK OS
+# CNGSM — Cloves Nascimento
+
 models:
   llama-3-8b:
+    name: "Llama 3 8B"
+    version: "3.0"
     layers: 32
-    params: 8000000000
-    format: chunk_v1
+    total_params: 8000000000
+    size_gb: 16.0
+    weight_format: "fp16"
     page_size: 262144
-  
+    recommended_ram_mb: 1536
+    min_ram_mb: 1024
+    
   mixtral-8x7b:
+    name: "Mixtral 8x7B"
+    version: "0.1"
     layers: 32
-    params: 46700000000
-    format: chunk_v1
+    total_params: 47000000000
+    size_gb: 32.0
+    weight_format: "fp16"
     page_size: 262144
-  
+    recommended_ram_mb: 2048
+    min_ram_mb: 1536
+    
   gemma-2b:
+    name: "Gemma 2B"
+    version: "1.0"
     layers: 18
-    params: 2000000000
-    format: chunk_v1
+    total_params: 2000000000
+    size_gb: 4.0
+    weight_format: "fp16"
     page_size: 262144
-
+    recommended_ram_mb: 512
+    min_ram_mb: 384
+    
   phi-2:
-    layers: 32
-    params: 2700000000
-    format: chunk_v1
+    name: "Phi-2"
+    version: "2.0"
+    layers: 24
+    total_params: 2700000000
+    size_gb: 5.4
+    weight_format: "fp16"
     page_size: 262144
+    recommended_ram_mb: 768
+    min_ram_mb: 512

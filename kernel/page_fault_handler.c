@@ -6,15 +6,13 @@
 #include <string.h>
 #include <sys/mman.h>
 
+// Protótipo interno (implementado no nmm.c ou nmm.h)
+extern int handle_page_fault(chunk_nmm_context_t* ctx, chunk_layer_t layer, uint32_t page_idx);
+
 // Contexto global para o handler de page fault
 static chunk_nmm_context_t* fault_handler_ctx = NULL;
 static void* fault_virtual_region = NULL;
 static uint64_t fault_virtual_size = 0;
-
-// Forward declaration of handle_page_fault if not in nmm.h
-// Actually it should be accessible or we should call an API.
-// In nmm.c we have it as static, let's assume we need to export it or use a wrapper.
-// For this prototype, let's assume nmm.h has a way to resolve faults.
 
 // Mapeia endereço virtual para (layer, page, offset)
 static int virtual_to_chunk(void* fault_addr,
@@ -28,7 +26,6 @@ static int virtual_to_chunk(void* fault_addr,
     if (relative >= fault_virtual_size) return -1;
     
     // Layout: [layer:4bytes][page:4bytes][offset:4bytes]
-    // Este layout é uma simplificação para o protótipo
     *layer = (relative >> 32) & 0xFFFFFFFF;
     *page_idx = (relative >> 20) & 0xFFF;
     *offset = relative & 0xFFFFF;
@@ -38,6 +35,7 @@ static int virtual_to_chunk(void* fault_addr,
 
 // Signal handler para SIGSEGV
 static void chunk_page_fault_handler(int sig, siginfo_t* info, void* context) {
+    (void)sig; (void)context;
     void* fault_addr = info->si_addr;
     
     chunk_layer_t layer;
@@ -46,16 +44,12 @@ static void chunk_page_fault_handler(int sig, siginfo_t* info, void* context) {
     if (virtual_to_chunk(fault_addr, &layer, &page_idx, &offset) == 0) {
         // É um page fault gerenciado pelo CHUNK
         if (fault_handler_ctx) {
-            // No protótipo, nmm.c deveria prover uma função pública para resolver faults
-            // Vamos assumir que nmm_load_page existe ou handle_page_fault é exportado
-            // nmm_get_weights(fault_handler_ctx, layer, page_idx * CHUNK_WEIGHT_PAGE_SIZE, CHUNK_WEIGHT_PAGE_SIZE);
-            
-            // Para simplificar o protótipo, vamos imprimir e sair se não puder resolver
-            // printf("CHUNK: Resolvendo fault em %p (Layer %u, Page %u)\n", fault_addr, layer, page_idx);
-            
-            // Em uma implementação real, aqui mprotect seria usado para habilitar acesso
-            // mprotect(page_addr, CHUNK_WEIGHT_PAGE_SIZE, PROT_READ);
-            return;
+            // Tenta resolver o page fault
+            int resolved = handle_page_fault(fault_handler_ctx, layer, page_idx);
+            if (resolved == 0) {
+                // Page fault resolvido, retorna
+                return;
+            }
         }
     }
     
