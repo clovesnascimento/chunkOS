@@ -1,4 +1,8 @@
-# CHUNK OS - Neural Memory Manager
+<p align="center">
+  <img src="assets/logo.svg" width="200" alt="ChunkOS Logo">
+</p>
+
+# 🧠 CHUNK OS — Cognitive Hierarchical Unified Neural Kernel
 
 ## Sistema Operacional para LLMs com Memória Paginada por Camadas
 
