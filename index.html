@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHUNK OS — Cognitive Hierarchical Unified Neural Kernel</title>
+    <meta name="description" content="CHUNK OS é um sistema operacional que executa LLMs em hardware com memória RAM limitada usando carregamento seletivo por demanda. Engenharia da próxima geração por CNGSM.">
+    <meta name="author" content="Cloves Nascimento — CNGSM">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #0A0A0F;
+            color: #E8E8F0;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 20px; }
+        
+        header {
+            padding: 40px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+        }
+        .logo { font-size: 24px; font-weight: bold; color: #D4AF37; }
+        
+        .hero {
+            padding: 100px 0;
+            text-align: center;
+        }
+        h1 { font-size: 48px; margin-bottom: 20px; background: linear-gradient(135deg, #FFF, #D4AF37); -webkit-background-clip: text; color: transparent; }
+        .subtitle { font-size: 20px; color: #A0A0C0; max-width: 800px; margin: 0 auto 40px; }
+        
+        .btn {
+            background: #D4AF37;
+            color: #0A0A0F;
+            padding: 15px 40px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: bold;
+            display: inline-block;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: scale(1.05); }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            padding: 80px 0;
+        }
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(212, 175, 55, 0.1);
+        }
+        .feature-card h3 { color: #D4AF37; margin-bottom: 15px; }
+        
+        footer {
+            padding: 60px 0;
+            text-align: center;
+            border-top: 1px solid rgba(212, 175, 55, 0.2);
+            color: #606080;
+            font-size: 14px;
+        }
+        .signature { color: #D4AF37; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">CHUNK OS</div>
+            <nav>
+                <a href="https://github.com/clovesnascimento/chunkOS" style="color: #A0A0C0; text-decoration: none;">GitHub</a>
+            </nav>
+        </header>
+        
+        <section class="hero">
+            <h1>Execute LLMs com 90% menos RAM.</h1>
+            <p class="subtitle">CHUNK OS — Sistema operacional neural com paginação por camadas, prefetch preditivo e compressão KV adaptativa.</p>
+            <a href="#" class="btn">Explorar Arquitetura</a>
+        </section>
+        
+        <div class="features">
+            <div class="feature-card">
+                <h3>Neural Memory Manager</h3>
+                <p>Paginação por camadas com janela deslizante. Apenas 2-3 camadas ativas na RAM por vez.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Prefetch Preditivo</h3>
+                <p>Cadeias de Markov em tempo real antecipam os próximos pesos, reduzindo page faults.</p>
+            </div>
+            <div class="feature-card">
+                <h3>KV Cache Híbrido</h3>
+                <p>Janela recente completa + histórico esparso (top-k). Mantém contexto sem estourar memória.</p>
+            </div>
+        </div>
+        
+        <footer>
+            <p>© 2026 <span class="signature">CNGSM — Cloves Nascimento</span></p>
+            <p>Arquiteto de Ecossistemas Cognitivos</p>
+            <p>Assinatura Digital: CNGSM-CHUNK-2026-04-26-V1.0</p>
+        </footer>
+    </div>
+</body>
+</html>

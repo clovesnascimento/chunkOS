@@ -1,0 +1,24 @@
+models:
+  llama-3-8b:
+    layers: 32
+    params: 8000000000
+    format: chunk_v1
+    page_size: 262144
+  
+  mixtral-8x7b:
+    layers: 32
+    params: 46700000000
+    format: chunk_v1
+    page_size: 262144
+  
+  gemma-2b:
+    layers: 18
+    params: 2000000000
+    format: chunk_v1
+    page_size: 262144
+
+  phi-2:
+    layers: 32
+    params: 2700000000
+    format: chunk_v1
+    page_size: 262144

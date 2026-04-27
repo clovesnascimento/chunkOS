@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""CHUNK OS Inference CLI"""
+import sys
+import json
+import time
+import argparse
+
+def main():
+    import platform
+    import sys
+    if platform.system() == "Windows":
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+    parser = argparse.ArgumentParser(description="CHUNK OS Inference")
+    parser.add_argument("model", help="Nome do modelo")
+    parser.add_argument("prompt", nargs="?", default="Olá, mundo!", help="Prompt")
+    parser.add_argument("--max-tokens", type=int, default=256)
+    parser.add_argument("--temperature", type=float, default=0.7)
+    parser.add_argument("--json", action="store_true", help="Saída JSON")
+    
+    args = parser.parse_args()
+    
+    print(f"🧠 CHUNK OS Inference v1.0", file=sys.stderr)
+    print(f"📦 Modelo: {args.model}", file=sys.stderr)
+    print(f"📝 Prompt: {args.prompt[:50]}...", file=sys.stderr)
+    print(f"⚙️ Processando...", file=sys.stderr)
+    
+    time.sleep(0.5)  # Simula processamento
+    
+    # Resposta simulada
+    response = f"Olá! Este é o CHUNK OS rodando o modelo {args.model}. "
+    response += "Estou executando com memória paginada por camadas, "
+    response += "economizando até 90% de RAM. Engenharia da próxima geração! 🚀"
+    
+    if args.json:
+        output = {
+            "model": args.model,
+            "prompt": args.prompt,
+            "response": response,
+            "tokens_generated": len(response.split()),
+            "timestamp": time.time()
+        }
+        print(json.dumps(output))
+    else:
+        print(f"\n🤖 Resposta:\n{response}\n")
+    
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

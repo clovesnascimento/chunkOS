@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+"""CHUNK OS System Monitor"""
+import sys
+import time
+import json
+import argparse
+from datetime import datetime
+
+class ChunkMonitor:
+    def __init__(self):
+        self.running = True
+        self.stats = {
+            "page_faults": 0,
+            "prefetch_hits": 0,
+            "ram_used_mb": 0,
+            "ram_limit_mb": 1536
+        }
+    
+    def update_stats(self):
+        # Simula atualização de métricas
+        import random
+        self.stats["page_faults"] += random.randint(0, 3)
+        self.stats["prefetch_hits"] += random.randint(5, 15)
+        self.stats["ram_used_mb"] = min(self.stats["ram_limit_mb"] - 100 + random.randint(-50, 50),
+                                        self.stats["ram_limit_mb"])
+    
+    def render(self):
+        hit_rate = self.stats["prefetch_hits"] / (self.stats["page_faults"] + self.stats["prefetch_hits"] + 1) * 100
+        ram_percent = self.stats["ram_used_mb"] / self.stats["ram_limit_mb"] * 100
+        
+        lines = [
+            "╔══════════════════════════════════════════════════════════════════╗",
+            "║                    CHUNK OS — SYSTEM MONITOR                      ║",
+            "╠══════════════════════════════════════════════════════════════════╣",
+            f"║  📊 Page Faults:     {self.stats['page_faults']:>10}                                        ║",
+            f"║  🚀 Prefetch Hits:   {self.stats['prefetch_hits']:>10}                                        ║",
+            f"║  🎯 Hit Rate:        {hit_rate:>9.1f}%                                        ║",
+            f"║  💾 RAM Usage:       {self.stats['ram_used_mb']:>6} MB / {self.stats['ram_limit_mb']} MB ({ram_percent:.0f}%)            ║",
+            "╚══════════════════════════════════════════════════════════════════╝"
+        ]
+        
+        sys.stdout.write("\033[2J\033[H")  # Clear screen
+        for line in lines:
+            print(line)
+    
+    def run(self, interval=1):
+        try:
+            while self.running:
+                self.update_stats()
+                self.render()
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            print("\n👋 Monitor encerrado")
+
+def main():
+    import platform
+    import sys
+    if platform.system() == "Windows":
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+    parser = argparse.ArgumentParser(description="CHUNK OS Monitor")
+    parser.add_argument("--interval", type=int, default=1, help="Intervalo de atualização (s)")
+    parser.add_argument("--once", action="store_true", help="Executar uma vez")
+    parser.add_argument("--json", action="store_true", help="Saída JSON")
+    
+    args = parser.parse_args()
+    
+    monitor = ChunkMonitor()
+    
+    if args.once:
+        monitor.update_stats()
+        if args.json:
+            print(json.dumps(monitor.stats))
+        else:
+            monitor.render()
+    else:
+        monitor.run(args.interval)
+
+if __name__ == "__main__":
+    main()

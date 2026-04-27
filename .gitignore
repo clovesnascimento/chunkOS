@@ -1,0 +1,20 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Logs
+*.log
+logs/
+chunk_system/logs/
+
+# Temporary files
+demo_output.txt
+dummy_input.txt
+
+# OS generated files
+.DS_Store
+Thumbs.db
