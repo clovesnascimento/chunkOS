@@ -65,6 +65,16 @@ sparsity_ratio = 0.1
 
 ---
 
+## 🚀 NOVIDADE: NMM KERNEL v2.0
+O **NMM Kernel** evoluiu! A versão **v2.0** agora inclui:
+- **Markov Prefetcher**: Aprendizado de padrões em tempo real.
+- **DMA Assíncrono**: Maior fluidez nas transferências de pesos.
+- **Compressão KV Híbrida**: Economia de memória otimizada (92.6%).
+
+Execute a demo agora: `python3 nmm_kernel_v2.py --demo`
+
+---
+
 **Engenheiros da Próxima Geração**
 CHUNK foi projetado por engenheiros que não aceitam "não dá" como resposta.
 
